@@ -8,6 +8,10 @@ Electron + TypeScript + Milkdown Crepe 实现的类 Typora 所见即所得 Markd
 - `npm run dist` 打包 macOS universal dmg（未签名，首次打开右键“打开”）
 - `npm test` 单元测试；`npm run test:smoke -- <临时目录>` Electron 冒烟测试（需要 xvfb 或真实显示器）
 
+## 安装排错
+- 安装时报 `Electron failed to install correctly` / `fetch failed`：说明从 GitHub 下载 Electron 二进制失败。项目已在 `.npmrc` 中配置 npmmirror 镜像；若仍失败，可设置代理（如 `export HTTPS_PROXY=http://127.0.0.1:7890`），然后 `rm -rf node_modules/electron && npm install`，或手动执行 `node node_modules/electron/install.js`。
+- 建议使用 Node LTS（20/22）；过新的 Node 版本可能出现兼容问题。
+
 ## 结构
 - `src/main/` 主进程：窗口与多文档状态、菜单、文件读写/监视、图片落盘、导出、设置
 - `src/renderer/` 渲染进程：编辑器封装 `editor.ts`、ProseMirror 插件 `plugins.ts`（查找/专注/粘贴图片）、侧边栏、主题
