@@ -119,12 +119,22 @@ function renderBody(markdown: string): { html: string; headings: Heading[] } {
     t.attrSet('id', id)
     headings.push({ level: Number(t.tag.slice(1)), text, id })
   })
-  return { html: md.renderer.render(tokens, md.options, {}), headings }
+  let html = md.renderer.render(tokens, md.options, {})
+  // Typora 的 [TOC]：独占一段时，替换为文内目录
+  if (headings.length) {
+    const min = Math.min(...headings.map((h) => h.level))
+    const list = headings
+      .map((h) => `<div class="toc-item" style="margin-left:${(h.level - min) * 1.4}em"><a href="#${h.id}">${esc(h.text)}</a></div>`)
+      .join('')
+    html = html.replace(/<p>\[TOC\]<\/p>/gi, `<div class="toc-inline">${list}</div>`)
+  }
+  return { html, headings }
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
 const NAV_CSS = `
+.toc-inline{margin:1em 0;line-height:1.8}.toc-inline a{color:inherit;text-decoration:none}.toc-inline a:hover{color:#0969da}
 #toc{position:fixed;top:0;left:0;bottom:0;width:260px;overflow:auto;padding:16px 12px;box-sizing:border-box;border-right:1px solid #d8dee4;background:#f6f8fa;font-size:14px;line-height:1.5}
 #toc a{display:block;color:#24292f;text-decoration:none;padding:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #toc a:hover{color:#0969da}
