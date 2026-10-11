@@ -49,7 +49,7 @@
       "en"
     ],
     "dmg": {
-      "format": "ULMO"
+      "format": "UDBZ"
     }
   },
   "devDependencies": {
