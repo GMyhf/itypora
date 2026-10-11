@@ -121,6 +121,30 @@ export class Editor {
     this.view?.focus()
   }
 
+  /** 把文档里指向 fromUrl（已解析的绝对 URL）的图片改成指向 to */
+  replaceImageSrc(fromUrl: string, to: string): boolean {
+    const view = this.view
+    if (!view) return false
+    const norm = (u: string) => {
+      try {
+        return new URL(u, this.baseUrl ?? undefined).href
+      } catch {
+        return u
+      }
+    }
+    const target = norm(fromUrl)
+    let tr = view.state.tr
+    let n = 0
+    view.state.doc.descendants((node, pos) => {
+      if ((node.type.name === 'image-block' || node.type.name === 'image') && norm(String(node.attrs.src)) === target) {
+        tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: to })
+        n++
+      }
+    })
+    if (n) view.dispatch(tr)
+    return n > 0
+  }
+
   insertImage(src: string) {
     this.crepe?.editor.action((ctx) => ctx.get(commandsCtx).call(insertImageCommand.key, { src, alt: '' }))
   }

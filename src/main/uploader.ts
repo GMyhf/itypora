@@ -36,6 +36,7 @@ export async function uploadFile(file: string, s: UploadConf): Promise<string> {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ list: [file] }),
+        signal: AbortSignal.timeout(90_000),
       })
     let res: Response
     try {

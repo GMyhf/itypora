@@ -5,7 +5,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { renderDocx, renderHtml, renderPdf } from './export'
 import { assetsDirName, docBaseUrl, findTempImages, relativeAssetRef } from './paths'
-import { uploadBytes, uploadEnabled, uploadLocalImages } from './uploader'
+import { uploadEnabled, uploadFile, uploadLocalImages } from './uploader'
 import { getSettings, loadSettings, patchSettings, Settings } from './settings'
 
 interface DocInit {
@@ -410,14 +410,6 @@ ipcMain.handle('fs:trash', async (_e, file: string) => {
 
 async function storeImage(doc: Doc, bytes: Uint8Array, ext: string): Promise<string> {
   const clean = ext.replace(/[^a-z0-9]/gi, '').toLowerCase() || 'png'
-  if (uploadEnabled(getSettings())) {
-    try {
-      return await uploadBytes(bytes, clean, getSettings())
-    } catch (err) {
-      // 上传失败时回退为本地保存，图片不丢；之后可用“上传所有本地图片”重试
-      dialog.showErrorBox('图片上传失败，已保存到本地', String((err as Error).message))
-    }
-  }
   const name = `${new Date().toISOString().replace(/\D/g, '').slice(0, 14)}-${randomUUID().slice(0, 6)}.${clean}`
   if (doc.path) {
     const dir = path.join(path.dirname(doc.path), assetsDirName(doc.path))
@@ -742,6 +734,24 @@ async function createWindow(init?: DocInit): Promise<Doc> {
         { label: '添加到词典', click: () => win.webContents.session.addWordToSpellCheckerDictionary(p.misspelledWord) },
         { type: 'separator' },
       )
+    }
+    if (p.mediaType === 'image' && p.srcURL.startsWith('file:')) {
+      items.push({
+        label: '上传图片到图床',
+        click: async () => {
+          if (!uploadEnabled(getSettings())) {
+            dialog.showErrorBox('未启用图床', '请先在 偏好设置 中选择图床（PicGo 或自定义命令）。')
+            return
+          }
+          try {
+            const url = await uploadFile(fileURLToPath(p.srcURL), getSettings())
+            send(doc, 'cmd', 'replace-image', { from: p.srcURL, to: url })
+          } catch (err) {
+            dialog.showErrorBox('图片上传失败', (err as Error).message)
+          }
+        },
+      })
+      items.push({ type: 'separator' })
     }
     if (p.isEditable) items.push({ role: 'cut', label: '剪切' })
     if (p.isEditable || p.selectionText) items.push({ role: 'copy', label: '拷贝' })

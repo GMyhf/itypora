@@ -428,6 +428,11 @@ api.on('cmd', async (name, arg) => {
       document.body.classList.toggle('typewriter', viewModes.typewriter)
       return
     }
+    case 'replace-image': {
+      const { from, to } = arg as { from: string; to: string }
+      if (!sourceMode && editor.replaceImageSrc(from, to)) markChanged()
+      return
+    }
     case 'upload-images': {
       const md = await api.uploadImages(markdown())
       if (md === null) return
