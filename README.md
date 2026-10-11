@@ -8,6 +8,13 @@ Electron + TypeScript + Milkdown Crepe 实现的类 Typora 所见即所得 Markd
 - `npm run dist` 打包 macOS universal dmg（未签名，首次打开右键“打开”）
 - `npm test` 单元测试；`npm run test:smoke -- <临时目录>` Electron 冒烟测试（需要 xvfb 或真实显示器）
 
+## 打包与分发
+- `npm run dist` 在 `release/` 下生成 arm64 的 `.app` 和 dmg（约 105 MB，Electron 框架本身占大头）。终端命令不走系统代理，下载 dmg 工具失败时先 `export HTTPS_PROXY=...`。
+- 未购买 Apple Developer 证书（99 美元/年），应用**未签名、未公证**，决定如下：
+  - **只在自己的 Mac 上用**：不需要证书。本机打包的应用没有隔离标记，把 `release/mac-arm64/iTypora.app` 拷到 `/Applications` 即可正常打开。
+  - **发给同学或学生**：对方首次打开需右键 → 打开；部分新版 macOS 还要到“系统设置 → 隐私与安全性”点“仍要打开”。人少时把这个步骤告诉对方即可，不必花钱。
+  - **公开发布**时再考虑办证书：加入 Apple Developer Program，创建 Developer ID Application 证书，并在 `build.mac` 里开启 `notarize`，配置 `APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD`、`APPLE_TEAM_ID`。
+
 ## 安装排错
 - 安装时报 `Electron failed to install correctly` / `fetch failed`：说明从 GitHub 下载 Electron 二进制失败。请用镜像环境变量重装：`rm -rf node_modules/electron && ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ npm install`（`.npmrc` 中的 `electron_mirror` 在较新的 npm 下会提示 Unknown config，后续版本可能失效）。也可设置代理（如 `export HTTPS_PROXY=http://127.0.0.1:7890`），或手动执行 `node node_modules/electron/install.js`。
 - `npm warn allow-scripts`（`electron-winstaller`、`fsevents`）可忽略，不影响 macOS 开发与运行。
