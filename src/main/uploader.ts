@@ -1,4 +1,4 @@
-import { exec } from 'child_process'
+import { exec, execFile } from 'child_process'
 import { promises as fs } from 'fs'
 import os from 'os'
 import path from 'path'
@@ -9,16 +9,45 @@ type UploadConf = Pick<Settings, 'imageUploader' | 'picgoUrl' | 'uploadCommand'>
 
 export const uploadEnabled = (s: UploadConf) => s.imageUploader !== 'none'
 
+async function launchPicgoAndRetry(post: () => Promise<Response>): Promise<Response> {
+  if (process.platform !== 'darwin') throw new Error('无法连接 PicGo，请确认 PicGo 已运行且已开启 Server')
+  await new Promise<void>((resolve, reject) =>
+    execFile('open', ['-g', '-a', 'PicGo'], (err) =>
+      err ? reject(new Error('无法连接 PicGo，且未能自动启动 PicGo.app，请手动打开 PicGo 并开启 Server')) : resolve(),
+    ),
+  )
+  let last: unknown
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 500))
+    try {
+      return await post()
+    } catch (err) {
+      last = err
+    }
+  }
+  throw new Error(`已启动 PicGo 但连接不上它的 Server，请在 PicGo 设置里开启 Server 并核对端口：${(last as Error).message}`)
+}
+
 /** 把本地图片文件上传到图床，返回图片 URL */
 export async function uploadFile(file: string, s: UploadConf): Promise<string> {
   if (s.imageUploader === 'picgo') {
-    const res = await fetch(s.picgoUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ list: [file] }),
-    })
-    const body = (await res.json()) as { success?: boolean; result?: string[]; message?: string }
-    if (!body.success || !body.result?.[0]) throw new Error(`PicGo 上传失败：${body.message ?? res.status}`)
+    const post = () =>
+      fetch(s.picgoUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ list: [file] }),
+      })
+    let res: Response
+    try {
+      res = await post()
+    } catch {
+      // 连不上多半是 PicGo 没在运行（Typora 会自动启动它），这里同样拉起并等待它的 Server 就绪
+      res = await launchPicgoAndRetry(post)
+    }
+    const body = (await res.json().catch(() => ({}))) as { success?: boolean; result?: string[]; message?: string }
+    if (!body.success || !body.result?.[0]) {
+      throw new Error(`PicGo 上传失败：${body.message ?? `HTTP ${res.status}`}（详见 ~/Library/Application Support/picgo/picgo.log）`)
+    }
     return body.result[0]
   }
   if (s.imageUploader === 'command') {
