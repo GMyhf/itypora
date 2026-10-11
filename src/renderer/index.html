@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: file: https: http:; font-src 'self' data:" />
+    <title>iTypora</title>
+  </head>
+  <body>
+    <div id="drag"></div>
+    <div id="shell">
+      <aside id="sidebar" hidden data-tab="outline">
+        <div class="tabs">
+          <button data-tab="outline" class="active">大纲</button>
+          <button data-tab="files">文件</button>
+        </div>
+        <div id="outline" class="panel"></div>
+        <div id="files" class="panel"></div>
+        <div id="resizer"></div>
+      </aside>
+      <div id="content">
+        <div id="findbar" hidden>
+          <input id="find-input" placeholder="查找" spellcheck="false" />
+          <span id="find-count"></span>
+          <button id="find-prev" title="上一个">↑</button>
+          <button id="find-next" title="下一个">↓</button>
+          <span class="replace-part">
+            <input id="replace-input" placeholder="替换为" spellcheck="false" />
+            <button id="replace-one">替换</button>
+            <button id="replace-all">全部替换</button>
+          </span>
+          <button id="find-close" title="关闭">✕</button>
+        </div>
+        <div id="scroller"><div id="app"></div></div>
+        <textarea id="source" hidden spellcheck="false"></textarea>
+        <div id="statusbar"><span id="mode-badge"></span><span id="stats"></span></div>
+      </div>
+    </div>
+
+    <div id="modal" hidden>
+      <form id="name-form" class="card" hidden>
+        <label id="name-title"></label>
+        <input id="name-input" spellcheck="false" />
+        <div class="actions"><button type="button" id="name-cancel">取消</button><button type="submit" class="primary">确定</button></div>
+      </form>
+      <form id="prefs-form" class="card" hidden>
+        <h3>偏好设置</h3>
+        <label>主题 <select id="pref-theme"></select></label>
+        <label>字号 <input id="pref-font-size" type="number" min="12" max="28" /></label>
+        <label>正文宽度 <input id="pref-line-width" type="number" min="480" max="1600" step="20" /></label>
+        <label>字体 <input id="pref-font-family" placeholder="留空使用默认字体" /></label>
+        <label class="check"><input id="pref-auto-save" type="checkbox" /> 自动保存（停止输入 2 秒后）</label>
+        <div class="actions"><button type="button" id="prefs-close" class="primary">完成</button></div>
+      </form>
+    </div>
+    <style id="custom-theme"></style>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
