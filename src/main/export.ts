@@ -176,6 +176,7 @@ export async function renderPdf(markdown: string, title: string, baseDir: string
       printBackground: true,
       pageSize: 'A4',
       generateDocumentOutline: true,
+      generateTaggedPDF: true, // 书签导航依赖带标签的 PDF
       displayHeaderFooter: show,
       headerTemplate: `<div style="${style};text-align:center">${fill(o.header, title)}</div>`,
       footerTemplate: `<div style="${style};text-align:center">${footer}</div>`,
