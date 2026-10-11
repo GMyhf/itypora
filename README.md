@@ -9,7 +9,8 @@ Electron + TypeScript + Milkdown Crepe 实现的类 Typora 所见即所得 Markd
 - `npm test` 单元测试；`npm run test:smoke -- <临时目录>` Electron 冒烟测试（需要 xvfb 或真实显示器）
 
 ## 安装排错
-- 安装时报 `Electron failed to install correctly` / `fetch failed`：说明从 GitHub 下载 Electron 二进制失败。项目已在 `.npmrc` 中配置 npmmirror 镜像；若仍失败，可设置代理（如 `export HTTPS_PROXY=http://127.0.0.1:7890`），然后 `rm -rf node_modules/electron && npm install`，或手动执行 `node node_modules/electron/install.js`。
+- 安装时报 `Electron failed to install correctly` / `fetch failed`：说明从 GitHub 下载 Electron 二进制失败。请用镜像环境变量重装：`rm -rf node_modules/electron && ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ npm install`（`.npmrc` 中的 `electron_mirror` 在较新的 npm 下会提示 Unknown config，后续版本可能失效）。也可设置代理（如 `export HTTPS_PROXY=http://127.0.0.1:7890`），或手动执行 `node node_modules/electron/install.js`。
+- `npm warn allow-scripts`（`electron-winstaller`、`fsevents`）可忽略，不影响 macOS 开发与运行。
 - 建议使用 Node LTS（20/22）；过新的 Node 版本可能出现兼容问题。
 
 ## 结构
