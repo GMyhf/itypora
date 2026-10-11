@@ -832,6 +832,11 @@ app.on('open-file', (e, file) => {
   else pendingOpen.push(file)
 })
 
+const appVersion: string = require('../../package.json').version
+app.setName('iTypora')
+// 开发模式下 app.getVersion() 返回的是 Electron 自己的版本号，这里显式用 package.json 的
+app.setAboutPanelOptions({ applicationName: 'iTypora', applicationVersion: appVersion, version: '' })
+
 app.whenReady().then(async () => {
   const s = await loadSettings()
   // 开发模式下没有 .app 包，手动设置 Dock 图标

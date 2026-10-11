@@ -8,7 +8,7 @@
     "build:renderer": "vite build",
     "build:main": "tsc -p tsconfig.main.json",
     "build": "npm run build:renderer && npm run build:main",
-    "start": "npm run build && electron .",
+    "start": "node scripts/dev-bundle.js && npm run build && electron .",
     "dist": "npm run build && electron-builder --mac",
     "test": "vitest run",
     "test:smoke": "xvfb-run -a node tests/smoke.mjs"
