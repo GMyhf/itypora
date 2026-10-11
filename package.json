@@ -55,5 +55,6 @@
     "@milkdown/crepe": "^7.22.3",
     "@milkdown/kit": "^7.22.3",
     "markdown-it": "^15.0.2"
-  }
+  },
+  "license": "MIT"
 }
