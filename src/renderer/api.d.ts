@@ -26,6 +26,11 @@ export interface Settings {
   imageUploader: 'none' | 'picgo' | 'command'
   picgoUrl: string
   uploadCommand: string
+  pdfHeader: string
+  pdfFooter: string
+  pdfPageNumbers: boolean
+  imageAlign: 'left' | 'center'
+  spellcheck: boolean
 }
 
 export interface Api {
@@ -48,7 +53,7 @@ export interface Api {
   saveImage(bytes: Uint8Array, ext: string): Promise<string>
   pickImage(): Promise<string | null>
   uploadImages(markdown: string): Promise<string | null>
-  exportDoc(kind: 'html' | 'pdf', markdown: string): Promise<boolean>
+  exportDoc(kind: 'html' | 'pdf' | 'docx', markdown: string): Promise<boolean>
   patchSettings(patch: Partial<Settings>): Promise<Settings>
   themeCss(id: string): Promise<string>
   pathForFile(f: File): string

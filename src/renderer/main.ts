@@ -332,6 +332,11 @@ function openPrefs() {
   $<HTMLSelectElement>('pref-uploader').value = settings.imageUploader
   $<HTMLInputElement>('pref-picgo-url').value = settings.picgoUrl
   $<HTMLInputElement>('pref-upload-cmd').value = settings.uploadCommand
+  $<HTMLSelectElement>('pref-image-align').value = settings.imageAlign
+  $<HTMLInputElement>('pref-pdf-header').value = settings.pdfHeader
+  $<HTMLInputElement>('pref-pdf-footer').value = settings.pdfFooter
+  $<HTMLInputElement>('pref-pdf-pages').checked = settings.pdfPageNumbers
+  $<HTMLInputElement>('pref-spellcheck').checked = settings.spellcheck
   syncUploaderRows()
   modal.hidden = false
   prefsForm.hidden = false
@@ -348,6 +353,11 @@ $('pref-uploader').addEventListener('change', (e) => {
 })
 $('pref-picgo-url').addEventListener('change', (e) => api.patchSettings({ picgoUrl: (e.target as HTMLInputElement).value.trim() }))
 $('pref-upload-cmd').addEventListener('change', (e) => api.patchSettings({ uploadCommand: (e.target as HTMLInputElement).value.trim() }))
+$('pref-image-align').addEventListener('change', (e) => api.patchSettings({ imageAlign: (e.target as HTMLSelectElement).value as Settings['imageAlign'] }))
+$('pref-pdf-header').addEventListener('change', (e) => api.patchSettings({ pdfHeader: (e.target as HTMLInputElement).value.trim() }))
+$('pref-pdf-footer').addEventListener('change', (e) => api.patchSettings({ pdfFooter: (e.target as HTMLInputElement).value.trim() }))
+$('pref-pdf-pages').addEventListener('change', (e) => api.patchSettings({ pdfPageNumbers: (e.target as HTMLInputElement).checked }))
+$('pref-spellcheck').addEventListener('change', (e) => api.patchSettings({ spellcheck: (e.target as HTMLInputElement).checked }))
 prefsForm.addEventListener('submit', (e) => e.preventDefault())
 $('prefs-close').addEventListener('click', closeModal)
 $('pref-theme').addEventListener('change', (e) => api.patchSettings({ theme: (e.target as HTMLSelectElement).value }))
@@ -369,6 +379,7 @@ const dark = matchMedia('(prefers-color-scheme: dark)')
 async function applySettings(s: Settings) {
   const prevTheme = settings?.theme
   settings = s
+  root.dataset.imageAlign = s.imageAlign
   root.style.setProperty('--font-size', `${s.fontSize}px`)
   root.style.setProperty('--line-width', `${s.lineWidth}px`)
   root.style.setProperty('--sidebar-width', `${s.sidebarWidth}px`)
@@ -385,7 +396,7 @@ dark.addEventListener('change', () => settings && applySettings(settings))
 
 // ---------- 命令分发 ----------
 
-async function exportDoc(kind: 'html' | 'pdf') {
+async function exportDoc(kind: 'html' | 'pdf' | 'docx') {
   await api.exportDoc(kind, markdown())
 }
 
@@ -395,6 +406,7 @@ api.on('cmd', async (name, arg) => {
     case 'save-as': return save(true)
     case 'export-html': return exportDoc('html')
     case 'export-pdf': return exportDoc('pdf')
+    case 'export-docx': return exportDoc('docx')
     case 'find': return openFind(false)
     case 'replace': return openFind(true)
     case 'preferences': return openPrefs()

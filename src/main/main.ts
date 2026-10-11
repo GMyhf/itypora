@@ -1,9 +1,9 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, MenuItemConstructorOptions, nativeTheme, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, MenuItemConstructorOptions, nativeTheme, session, shell } from 'electron'
 import { promises as fs, watch, FSWatcher } from 'fs'
 import { randomUUID } from 'crypto'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { renderHtml, renderPdf } from './export'
+import { renderDocx, renderHtml, renderPdf } from './export'
 import { assetsDirName, docBaseUrl, findTempImages, relativeAssetRef } from './paths'
 import { uploadBytes, uploadEnabled, uploadLocalImages } from './uploader'
 import { getSettings, loadSettings, patchSettings, Settings } from './settings'
@@ -461,19 +461,29 @@ ipcMain.handle('image:upload-all', async (e, markdown: string) => {
   return r.uploaded ? r.markdown : null
 })
 
-ipcMain.handle('export:doc', async (e, kind: 'html' | 'pdf', markdown: string) => {
+ipcMain.handle('export:doc', async (e, kind: 'html' | 'pdf' | 'docx', markdown: string) => {
   const doc = docOf(e)
   if (!doc) return false
   const base = doc.path ? path.basename(doc.path, path.extname(doc.path)) : '未命名'
   const r = await dialog.showSaveDialog(doc.win, {
     defaultPath: path.join(doc.path ? path.dirname(doc.path) : app.getPath('documents'), `${base}.${kind}`),
-    filters: [kind === 'html' ? { name: 'HTML', extensions: ['html'] } : { name: 'PDF', extensions: ['pdf'] }],
+    filters: [{ name: kind.toUpperCase(), extensions: [kind] }],
   })
   if (r.canceled || !r.filePath) return false
   const baseDir = doc.path ? path.dirname(doc.path) : undefined
   try {
-    if (kind === 'html') await fs.writeFile(r.filePath, await renderHtml(markdown, base, baseDir), 'utf8')
-    else await fs.writeFile(r.filePath, await renderPdf(markdown, base, baseDir))
+    const s = getSettings()
+    if (kind === 'html') await fs.writeFile(r.filePath, await renderHtml(markdown, base, baseDir, { imageAlign: s.imageAlign }), 'utf8')
+    else if (kind === 'docx') await renderDocx(markdown, baseDir, r.filePath)
+    else {
+      const pdf = await renderPdf(markdown, base, baseDir, {
+        header: s.pdfHeader,
+        footer: s.pdfFooter,
+        pageNumbers: s.pdfPageNumbers,
+        imageAlign: s.imageAlign,
+      })
+      await fs.writeFile(r.filePath, pdf)
+    }
   } catch (err) {
     dialog.showErrorBox('导出失败', String(err))
     return false
@@ -496,6 +506,13 @@ async function listThemes() {
   return [...BUILTIN_THEMES, ...custom]
 }
 
+function applySpellcheck(on: boolean) {
+  const ses = session.defaultSession
+  ses.setSpellCheckerEnabled(on)
+  // 中英文混写：同时检查英文与美式英文词典即可，中文不参与拼写检查
+  if (process.platform !== 'darwin') ses.setSpellCheckerLanguages(['en-US'])
+}
+
 function applyNativeTheme(theme: string) {
   nativeTheme.themeSource = theme === 'system' ? 'system' : DARK_THEMES.has(theme) ? 'dark' : 'light'
 }
@@ -503,6 +520,7 @@ function applyNativeTheme(theme: string) {
 async function applySettings(patch: Partial<Settings>) {
   const s = await patchSettings(patch)
   if ('theme' in patch) applyNativeTheme(s.theme)
+  if ('spellcheck' in patch) applySpellcheck(s.spellcheck)
   for (const d of docs.values()) send(d, 'settings:changed', s)
   buildMenu()
   return s
@@ -578,7 +596,7 @@ async function buildMenu() {
         { type: 'separator' },
         {
           label: '导出',
-          submenu: [item('HTML…', undefined, 'export-html'), item('PDF…', undefined, 'export-pdf')],
+          submenu: [item('HTML…', undefined, 'export-html'), item('PDF…', undefined, 'export-pdf'), item('Word (.docx)…', undefined, 'export-docx')],
         },
         { type: 'separator' },
         { role: 'close', label: '关闭窗口' },
@@ -595,6 +613,12 @@ async function buildMenu() {
         { role: 'paste', label: '粘贴' },
         { role: 'selectAll', label: '全选' },
         { type: 'separator' },
+        {
+          label: '拼写检查',
+          type: 'checkbox',
+          checked: s.spellcheck,
+          click: (mi) => applySettings({ spellcheck: mi.checked }),
+        },
         item('查找…', 'CmdOrCtrl+F', 'find'),
         item('查找并替换…', 'Alt+CmdOrCtrl+F', 'replace'),
         { type: 'separator' },
@@ -707,6 +731,23 @@ async function createWindow(init?: DocInit): Promise<Doc> {
   docs.set(id, doc)
 
   win.once('ready-to-show', () => win.show())
+  win.webContents.on('context-menu', (_e, p) => {
+    const items: MenuItemConstructorOptions[] = []
+    if (p.misspelledWord) {
+      for (const w of p.dictionarySuggestions.slice(0, 5)) {
+        items.push({ label: w, click: () => win.webContents.replaceMisspelling(w) })
+      }
+      if (!p.dictionarySuggestions.length) items.push({ label: '无拼写建议', enabled: false })
+      items.push(
+        { label: '添加到词典', click: () => win.webContents.session.addWordToSpellCheckerDictionary(p.misspelledWord) },
+        { type: 'separator' },
+      )
+    }
+    if (p.isEditable) items.push({ role: 'cut', label: '剪切' })
+    if (p.isEditable || p.selectionText) items.push({ role: 'copy', label: '拷贝' })
+    if (p.isEditable) items.push({ role: 'paste', label: '粘贴' }, { role: 'selectAll', label: '全选' })
+    if (items.length) Menu.buildFromTemplate(items).popup({ window: win })
+  })
   win.webContents.on('will-navigate', (e, url) => {
     e.preventDefault()
     if (/^https?:|^mailto:/i.test(url)) shell.openExternal(url)
@@ -796,6 +837,7 @@ app.whenReady().then(async () => {
   // 开发模式下没有 .app 包，手动设置 Dock 图标
   if (!app.isPackaged) app.dock?.setIcon(path.join(__dirname, '../../build/icon.png'))
   applyNativeTheme(s.theme)
+  applySpellcheck(s.spellcheck)
   buildMenu()
   cleanOldTmpImages()
   appReady = true

@@ -51,6 +51,11 @@
         <label>图床 <select id="pref-uploader"><option value="none">不使用（保存到本地）</option><option value="picgo">PicGo 应用（HTTP 服务）</option><option value="command">自定义命令</option></select></label>
         <label id="row-picgo" hidden>PicGo 地址 <input id="pref-picgo-url" placeholder="http://127.0.0.1:36677/upload" /></label>
         <label id="row-cmd" hidden>上传命令 <input id="pref-upload-cmd" placeholder="如 picgo u 或 /path/to/upload.sh" /></label>
+        <label>图片对齐 <select id="pref-image-align"><option value="center">居中</option><option value="left">左对齐</option></select></label>
+        <label>PDF 页眉 <input id="pref-pdf-header" placeholder="可用 {title} {date}" /></label>
+        <label>PDF 页脚 <input id="pref-pdf-footer" placeholder="可用 {title} {date}" /></label>
+        <label class="check"><input id="pref-pdf-pages" type="checkbox" /> PDF 页脚显示页码</label>
+        <label class="check"><input id="pref-spellcheck" type="checkbox" /> 拼写检查</label>
         <label class="check"><input id="pref-auto-save" type="checkbox" /> 自动保存（停止输入 2 秒后）</label>
         <div class="actions"><button type="button" id="prefs-close" class="primary">完成</button></div>
       </form>

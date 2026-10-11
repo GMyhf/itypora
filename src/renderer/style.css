@@ -97,7 +97,7 @@ html[data-platform='darwin'] #sidebar { padding-top: 28px; }
 .card {
   background: var(--page-bg); color: var(--chrome-fg); border: 1px solid var(--chrome-border);
   border-radius: 10px; padding: 18px 20px; width: 340px; display: flex; flex-direction: column; gap: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25); font-size: 13px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25); font-size: 13px; max-height: 85vh; overflow-y: auto;
 }
 .card h3 { margin: 0; font-size: 15px; }
 .card label { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -110,3 +110,8 @@ html[data-platform='darwin'] #sidebar { padding-top: 28px; }
 #name-form input { width: auto; }
 .card .actions { display: flex; justify-content: flex-end; gap: 8px; }
 .card button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* 图片对齐 */
+html[data-image-align='center'] .milkdown .milkdown-image-block { margin-left: auto; margin-right: auto; }
+html[data-image-align='center'] .milkdown .milkdown-image-block > .image-wrapper { margin-left: auto; margin-right: auto; }
+html[data-image-align='center'] .milkdown p:has(> .milkdown-image-inline:only-child) { text-align: center; }

@@ -21,7 +21,7 @@ contextBridge.exposeInMainWorld('api', {
   saveImage: (bytes: Uint8Array, ext: string) => invoke('image:save', bytes, ext),
   uploadImages: (markdown: string) => invoke('image:upload-all', markdown),
   pickImage: () => invoke('image:pick'),
-  exportDoc: (kind: 'html' | 'pdf', markdown: string) => invoke('export:doc', kind, markdown),
+  exportDoc: (kind: 'html' | 'pdf' | 'docx', markdown: string) => invoke('export:doc', kind, markdown),
   patchSettings: (patch: Record<string, unknown>) => invoke('settings:patch', patch),
   themeCss: (id: string) => invoke('theme:css', id),
   pathForFile: (f: File) => webUtils.getPathForFile(f),

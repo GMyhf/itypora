@@ -1,3 +1,4 @@
+import { execFile } from 'child_process'
 import { BrowserWindow } from 'electron'
 import { promises as fs } from 'fs'
 import katex from 'katex'
@@ -72,7 +73,7 @@ code{background:#f3f4f6;padding:.15em .35em;border-radius:4px;font-family:Menlo,
 pre{background:#f6f8fa;padding:14px 16px;border-radius:6px;overflow:auto}pre code{background:none;padding:0}
 blockquote{margin:0;padding:0 1em;color:#57606a;border-left:4px solid #d0d7de}
 table{border-collapse:collapse}th,td{border:1px solid #d0d7de;padding:6px 13px}
-img{max-width:100%}hr{border:0;border-top:1px solid #d0d7de}
+img{max-width:100%}.img-center img{display:block;margin:0 auto}.img-center p:has(>img:only-child){text-align:center}hr{border:0;border-top:1px solid #d0d7de}
 @media print{body{margin:0;max-width:none}}
 `
 
@@ -136,7 +137,7 @@ export async function renderHtml(
   markdown: string,
   title: string,
   baseDir?: string,
-  opts: { toc?: boolean } = {},
+  opts: { toc?: boolean; imageAlign?: string } = {},
 ): Promise<string> {
   const base = baseDir ? `<base href="${pathToFileURL(baseDir).toString()}/">` : ''
   const { html, headings } = renderBody(markdown)
@@ -147,18 +148,59 @@ export async function renderHtml(
         .map((h) => `<a href="#${h.id}" style="padding-left:${(h.level - minLevel) * 14}px">${esc(h.text)}</a>`)
         .join('')}</nav>`
     : ''
-  return `<!doctype html><html><head><meta charset="utf-8">${base}<title>${esc(title)}</title><style>${await loadKatexCss()}${CSS}${NAV_CSS}</style></head><body${toc ? ' class="has-toc"' : ''}>${nav}<main>${html}</main></body></html>`
+  return `<!doctype html><html><head><meta charset="utf-8">${base}<title>${esc(title)}</title><style>${await loadKatexCss()}${CSS}${NAV_CSS}</style></head><body class="${toc ? 'has-toc ' : ''}${opts.imageAlign === 'left' ? '' : 'img-center'}">${nav}<main>${html}</main></body></html>`
 }
 
-export async function renderPdf(markdown: string, title: string, baseDir?: string): Promise<Buffer> {
+export interface PdfOptions {
+  header: string
+  footer: string
+  pageNumbers: boolean
+  imageAlign: string
+}
+
+/** 页眉页脚文本：支持 {title}、{date} 占位符 */
+const fill = (text: string, title: string) =>
+  esc(text).replace(/\{title\}/g, esc(title)).replace(/\{date\}/g, new Date().toLocaleDateString('zh-CN'))
+
+export async function renderPdf(markdown: string, title: string, baseDir: string | undefined, o: PdfOptions): Promise<Buffer> {
   const tmp = path.join(os.tmpdir(), `itypora-${Date.now()}.html`)
-  await fs.writeFile(tmp, await renderHtml(markdown, title, baseDir, { toc: false }), 'utf8')
+  await fs.writeFile(tmp, await renderHtml(markdown, title, baseDir, { toc: false, imageAlign: o.imageAlign }), 'utf8')
   const win = new BrowserWindow({ show: false })
+  const style = 'font-size:9px;width:100%;margin:0 24px;color:#666;font-family:-apple-system,PingFang SC,sans-serif'
+  const show = !!(o.header || o.footer || o.pageNumbers)
+  const pages = o.pageNumbers ? '<span class="pageNumber"></span> / <span class="totalPages"></span>' : ''
+  const footer = [fill(o.footer, title), pages].filter(Boolean).join('&nbsp;&nbsp;&nbsp;')
   try {
     await win.loadFile(tmp)
-    return await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4', generateDocumentOutline: true })
+    return await win.webContents.printToPDF({
+      printBackground: true,
+      pageSize: 'A4',
+      generateDocumentOutline: true,
+      displayHeaderFooter: show,
+      headerTemplate: `<div style="${style};text-align:center">${fill(o.header, title)}</div>`,
+      footerTemplate: `<div style="${style};text-align:center">${footer}</div>`,
+      margins: show ? { top: 0.7, bottom: 0.7, left: 0.4, right: 0.4 } : undefined,
+    })
   } finally {
     win.destroy()
     fs.unlink(tmp).catch(() => {})
   }
+}
+
+/** 用 pandoc 导出 Word（公式转为原生 Word 公式）。macOS 图形界面应用的 PATH 不含 Homebrew，需补上。 */
+export function renderDocx(markdown: string, baseDir: string | undefined, outFile: string): Promise<void> {
+  const env = { ...process.env, PATH: `${process.env.PATH ?? ''}:/opt/homebrew/bin:/usr/local/bin` }
+  const args = ['-f', 'markdown+tex_math_dollars+tex_math_single_backslash+pipe_tables', '-t', 'docx', '-o', outFile]
+  if (baseDir) args.push('--resource-path', baseDir)
+  return new Promise((resolve, reject) => {
+    const p = execFile('pandoc', args, { env }, (err, _out, stderr) => {
+      if (!err) return resolve()
+      reject(
+        (err as NodeJS.ErrnoException).code === 'ENOENT'
+          ? new Error('未找到 pandoc。导出 Word 依赖 pandoc，请先安装：brew install pandoc')
+          : new Error(stderr || err.message),
+      )
+    })
+    p.stdin?.end(markdown)
+  })
 }

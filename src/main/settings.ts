@@ -15,6 +15,11 @@ export interface Settings {
   imageUploader: 'none' | 'picgo' | 'command'
   picgoUrl: string
   uploadCommand: string
+  pdfHeader: string
+  pdfFooter: string
+  pdfPageNumbers: boolean
+  imageAlign: 'left' | 'center'
+  spellcheck: boolean
 }
 
 export const DEFAULTS: Settings = {
@@ -30,6 +35,11 @@ export const DEFAULTS: Settings = {
   imageUploader: 'none',
   picgoUrl: 'http://127.0.0.1:36677/upload',
   uploadCommand: '',
+  pdfHeader: '',
+  pdfFooter: '',
+  pdfPageNumbers: true,
+  imageAlign: 'center',
+  spellcheck: true,
 }
 
 const file = () => path.join(app.getPath('userData'), 'settings.json')
