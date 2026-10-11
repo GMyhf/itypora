@@ -32,18 +32,18 @@ export const extOf = (f: File) => EXT[f.type] ?? (f.type.split('/')[1] || 'png')
 
 /** 命令名（菜单发来的）-> 具体的 Milkdown 命令 */
 const COMMANDS: Record<string, [any, ((arg: any) => unknown)?]> = {
-  bold: [toggleStrongCommand.key],
-  italic: [toggleEmphasisCommand.key],
-  'inline-code': [toggleInlineCodeCommand.key],
-  strike: [toggleStrikethroughCommand.key],
-  heading: [wrapInHeadingCommand.key, (n) => n],
-  paragraph: [turnIntoTextCommand.key],
-  blockquote: [wrapInBlockquoteCommand.key],
-  'ordered-list': [wrapInOrderedListCommand.key],
-  'bullet-list': [wrapInBulletListCommand.key],
-  'code-block': [createCodeBlockCommand.key],
-  table: [insertTableCommand.key, () => ({ row: 3, col: 3 })],
-  hr: [insertHrCommand.key],
+  bold: [toggleStrongCommand],
+  italic: [toggleEmphasisCommand],
+  'inline-code': [toggleInlineCodeCommand],
+  strike: [toggleStrikethroughCommand],
+  heading: [wrapInHeadingCommand, (n) => n],
+  paragraph: [turnIntoTextCommand],
+  blockquote: [wrapInBlockquoteCommand],
+  'ordered-list': [wrapInOrderedListCommand],
+  'bullet-list': [wrapInBulletListCommand],
+  'code-block': [createCodeBlockCommand],
+  table: [insertTableCommand, () => ({ row: 3, col: 3 })],
+  hr: [insertHrCommand],
 }
 
 export class Editor {
@@ -133,9 +133,9 @@ export class Editor {
     }
     const entry = COMMANDS[name]
     if (!entry || !this.crepe) return false
-    const [key, payload] = entry
+    const [cmd, payload] = entry
     this.view?.focus()
-    this.crepe.editor.action((ctx) => ctx.get(commandsCtx).call(key, payload?.(arg)))
+    this.crepe.editor.action((ctx) => ctx.get(commandsCtx).call(cmd.key, payload?.(arg)))
     return true
   }
 }
