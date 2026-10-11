@@ -40,7 +40,10 @@
         "role": "Editor"
       }
     ],
-    "productName": "iTypora"
+    "productName": "iTypora",
+    "directories": {
+      "output": "release"
+    }
   },
   "devDependencies": {
     "@types/markdown-it": "^14.2.0",
