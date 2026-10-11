@@ -48,6 +48,9 @@
         <label>字号 <input id="pref-font-size" type="number" min="12" max="28" /></label>
         <label>正文宽度 <input id="pref-line-width" type="number" min="480" max="1600" step="20" /></label>
         <label>字体 <input id="pref-font-family" placeholder="留空使用默认字体" /></label>
+        <label>图床 <select id="pref-uploader"><option value="none">不使用（保存到本地）</option><option value="picgo">PicGo 应用（HTTP 服务）</option><option value="command">自定义命令</option></select></label>
+        <label id="row-picgo" hidden>PicGo 地址 <input id="pref-picgo-url" placeholder="http://127.0.0.1:36677/upload" /></label>
+        <label id="row-cmd" hidden>上传命令 <input id="pref-upload-cmd" placeholder="如 picgo u 或 /path/to/upload.sh" /></label>
         <label class="check"><input id="pref-auto-save" type="checkbox" /> 自动保存（停止输入 2 秒后）</label>
         <div class="actions"><button type="button" id="prefs-close" class="primary">完成</button></div>
       </form>

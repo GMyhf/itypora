@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('api', {
   fsRename: (file: string, name: string) => invoke('fs:rename', file, name),
   fsTrash: (file: string) => invoke('fs:trash', file),
   saveImage: (bytes: Uint8Array, ext: string) => invoke('image:save', bytes, ext),
+  uploadImages: (markdown: string) => invoke('image:upload-all', markdown),
   pickImage: () => invoke('image:pick'),
   exportDoc: (kind: 'html' | 'pdf', markdown: string) => invoke('export:doc', kind, markdown),
   patchSettings: (patch: Record<string, unknown>) => invoke('settings:patch', patch),

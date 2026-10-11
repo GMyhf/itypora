@@ -23,6 +23,9 @@ export interface Settings {
   sidebarTab: 'outline' | 'files'
   sidebarWidth: number
   lastFolder: string | null
+  imageUploader: 'none' | 'picgo' | 'command'
+  picgoUrl: string
+  uploadCommand: string
 }
 
 export interface Api {
@@ -44,6 +47,7 @@ export interface Api {
   fsTrash(file: string): Promise<void>
   saveImage(bytes: Uint8Array, ext: string): Promise<string>
   pickImage(): Promise<string | null>
+  uploadImages(markdown: string): Promise<string | null>
   exportDoc(kind: 'html' | 'pdf', markdown: string): Promise<boolean>
   patchSettings(patch: Partial<Settings>): Promise<Settings>
   themeCss(id: string): Promise<string>

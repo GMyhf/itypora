@@ -12,6 +12,9 @@ export interface Settings {
   sidebarTab: 'outline' | 'files'
   sidebarWidth: number
   lastFolder: string | null
+  imageUploader: 'none' | 'picgo' | 'command'
+  picgoUrl: string
+  uploadCommand: string
 }
 
 export const DEFAULTS: Settings = {
@@ -24,6 +27,9 @@ export const DEFAULTS: Settings = {
   sidebarTab: 'outline',
   sidebarWidth: 240,
   lastFolder: null,
+  imageUploader: 'none',
+  picgoUrl: 'http://127.0.0.1:36677/upload',
+  uploadCommand: '',
 }
 
 const file = () => path.join(app.getPath('userData'), 'settings.json')

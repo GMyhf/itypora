@@ -329,10 +329,25 @@ function openPrefs() {
   $<HTMLInputElement>('pref-line-width').value = String(settings.lineWidth)
   $<HTMLInputElement>('pref-font-family').value = settings.fontFamily
   $<HTMLInputElement>('pref-auto-save').checked = settings.autoSave
+  $<HTMLSelectElement>('pref-uploader').value = settings.imageUploader
+  $<HTMLInputElement>('pref-picgo-url').value = settings.picgoUrl
+  $<HTMLInputElement>('pref-upload-cmd').value = settings.uploadCommand
+  syncUploaderRows()
   modal.hidden = false
   prefsForm.hidden = false
 }
 
+function syncUploaderRows() {
+  const v = $<HTMLSelectElement>('pref-uploader').value
+  $('row-picgo').hidden = v !== 'picgo'
+  $('row-cmd').hidden = v !== 'command'
+}
+$('pref-uploader').addEventListener('change', (e) => {
+  syncUploaderRows()
+  api.patchSettings({ imageUploader: (e.target as HTMLSelectElement).value as Settings['imageUploader'] })
+})
+$('pref-picgo-url').addEventListener('change', (e) => api.patchSettings({ picgoUrl: (e.target as HTMLInputElement).value.trim() }))
+$('pref-upload-cmd').addEventListener('change', (e) => api.patchSettings({ uploadCommand: (e.target as HTMLInputElement).value.trim() }))
 prefsForm.addEventListener('submit', (e) => e.preventDefault())
 $('prefs-close').addEventListener('click', closeModal)
 $('pref-theme').addEventListener('change', (e) => api.patchSettings({ theme: (e.target as HTMLSelectElement).value }))
@@ -399,6 +414,18 @@ api.on('cmd', async (name, arg) => {
     case 'toggle-typewriter': {
       viewModes.typewriter = !viewModes.typewriter
       document.body.classList.toggle('typewriter', viewModes.typewriter)
+      return
+    }
+    case 'upload-images': {
+      const md = await api.uploadImages(markdown())
+      if (md === null) return
+      if (sourceMode) source.value = md
+      else {
+        await editor.load(md)
+        baseline = editor.markdown()
+        loadedAt = performance.now()
+      }
+      markChanged()
       return
     }
     case 'insert-image': {

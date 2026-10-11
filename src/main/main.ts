@@ -5,6 +5,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { renderHtml, renderPdf } from './export'
 import { assetsDirName, docBaseUrl, findTempImages, relativeAssetRef } from './paths'
+import { uploadBytes, uploadEnabled, uploadLocalImages } from './uploader'
 import { getSettings, loadSettings, patchSettings, Settings } from './settings'
 
 interface DocInit {
@@ -409,6 +410,14 @@ ipcMain.handle('fs:trash', async (_e, file: string) => {
 
 async function storeImage(doc: Doc, bytes: Uint8Array, ext: string): Promise<string> {
   const clean = ext.replace(/[^a-z0-9]/gi, '').toLowerCase() || 'png'
+  if (uploadEnabled(getSettings())) {
+    try {
+      return await uploadBytes(bytes, clean, getSettings())
+    } catch (err) {
+      // 上传失败时回退为本地保存，图片不丢；之后可用“上传所有本地图片”重试
+      dialog.showErrorBox('图片上传失败，已保存到本地', String((err as Error).message))
+    }
+  }
   const name = `${new Date().toISOString().replace(/\D/g, '').slice(0, 14)}-${randomUUID().slice(0, 6)}.${clean}`
   if (doc.path) {
     const dir = path.join(path.dirname(doc.path), assetsDirName(doc.path))
@@ -439,6 +448,19 @@ ipcMain.handle('image:pick', async (e) => {
   return storeImage(doc, await fs.readFile(file), path.extname(file).slice(1))
 })
 
+ipcMain.handle('image:upload-all', async (e, markdown: string) => {
+  const doc = docOf(e)
+  if (!doc) return null
+  if (!uploadEnabled(getSettings())) {
+    dialog.showErrorBox('未启用图床', '请先在 偏好设置 → 图像 中选择上传服务（PicGo 或自定义命令）。')
+    return null
+  }
+  const r = await uploadLocalImages(markdown, doc.path ? path.dirname(doc.path) : null, getSettings())
+  if (r.failed.length) dialog.showErrorBox(`有 ${r.failed.length} 张图片上传失败`, r.failed.join('\n'))
+  else if (!r.uploaded) dialog.showMessageBox(doc.win, { message: '没有需要上传的本地图片。' })
+  return r.uploaded ? r.markdown : null
+})
+
 ipcMain.handle('export:doc', async (e, kind: 'html' | 'pdf', markdown: string) => {
   const doc = docOf(e)
   if (!doc) return false
@@ -450,7 +472,7 @@ ipcMain.handle('export:doc', async (e, kind: 'html' | 'pdf', markdown: string) =
   if (r.canceled || !r.filePath) return false
   const baseDir = doc.path ? path.dirname(doc.path) : undefined
   try {
-    if (kind === 'html') await fs.writeFile(r.filePath, renderHtml(markdown, base, baseDir), 'utf8')
+    if (kind === 'html') await fs.writeFile(r.filePath, await renderHtml(markdown, base, baseDir), 'utf8')
     else await fs.writeFile(r.filePath, await renderPdf(markdown, base, baseDir))
   } catch (err) {
     dialog.showErrorBox('导出失败', String(err))
@@ -577,6 +599,7 @@ async function buildMenu() {
         item('查找并替换…', 'Alt+CmdOrCtrl+F', 'replace'),
         { type: 'separator' },
         item('插入图片…', 'Ctrl+CmdOrCtrl+I', 'insert-image'),
+        item('上传所有本地图片', undefined, 'upload-images'),
       ],
     },
     {
