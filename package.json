@@ -27,7 +27,8 @@
             "universal"
           ]
         }
-      ]
+      ],
+      "icon": "build/icon.icns"
     },
     "fileAssociations": [
       {

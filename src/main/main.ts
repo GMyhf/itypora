@@ -770,6 +770,8 @@ app.on('open-file', (e, file) => {
 
 app.whenReady().then(async () => {
   const s = await loadSettings()
+  // 开发模式下没有 .app 包，手动设置 Dock 图标
+  if (!app.isPackaged) app.dock?.setIcon(path.join(__dirname, '../../build/icon.png'))
   applyNativeTheme(s.theme)
   buildMenu()
   cleanOldTmpImages()
