@@ -1,6 +1,6 @@
 {
   "name": "itypora",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "类 Typora 的所见即所得 Markdown 编辑器",
   "main": "dist/main/main.js",
   "scripts": {

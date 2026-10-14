@@ -9,7 +9,7 @@ Electron + TypeScript + Milkdown Crepe 实现的类 Typora 所见即所得 Markd
 - `npm test` 单元测试；`npm run test:smoke -- <临时目录>` Electron 冒烟测试（自动在该目录生成测试文档；需要 xvfb 或真实显示器）
 
 ## 打包与分发
-- `npm run dist` 在 `release/` 下生成 arm64 的 `.app` 和 dmg（约 105 MB，Electron 框架本身占大头）。终端命令不走系统代理，下载 dmg 工具失败时先 `export HTTPS_PROXY=...`。
+- `npm run dist` 在 `release/` 下生成 arm64 的 `.app` 和 dmg（约 106 MB，Electron 框架本身占大头）。终端命令不走系统代理，下载 dmg 工具失败时先 `export HTTPS_PROXY=...`。
 - 未购买 Apple Developer 证书（99 美元/年），应用**未签名、未公证**，决定如下：
   - **只在自己的 Mac 上用**：不需要证书。本机打包的应用没有隔离标记，把 `release/mac-arm64/iTypora.app` 拷到 `/Applications` 即可正常打开。
   - **发给同学或学生**：对方首次打开需右键 → 打开；部分新版 macOS 还要到“系统设置 → 隐私与安全性”点“仍要打开”。人少时把这个步骤告诉对方即可，不必花钱。
