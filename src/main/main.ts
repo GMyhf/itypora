@@ -1,12 +1,14 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, MenuItemConstructorOptions, nativeTheme, session, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, MenuItemConstructorOptions, nativeTheme, screen, session, shell } from 'electron'
 import { promises as fs, watch, FSWatcher } from 'fs'
 import { randomUUID } from 'crypto'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { renderDocx, renderHtml, renderPdf } from './export'
+import { renderBody, renderDocx, renderHtml, renderPdf } from './export'
+import { splitSlides } from './slides'
 import { assetsDirName, docBaseUrl, findTempImages, relativeAssetRef } from './paths'
 import { uploadEnabled, uploadFile, uploadLocalImages } from './uploader'
 import { getSettings, loadSettings, patchSettings, Settings } from './settings'
+import { flushSession, getBounds, getScroll, getSessionFiles, loadSession, setBounds, setScroll, setSessionFiles } from './session'
 
 interface DocInit {
   path?: string
@@ -139,6 +141,8 @@ function fileInfo(doc: Doc, content: string, reload = false) {
     path: doc.path,
     content,
     reload,
+    // 重新载入（外部修改）时保持当前位置；新打开时回到上次读到的地方
+    scroll: doc.path && !reload ? getScroll(doc.path) : 0,
     folder: doc.folder,
     baseUrl: doc.path ? docBaseUrl(doc.path) : null,
   }
@@ -311,6 +315,11 @@ ipcMain.on('doc:dirty', (e, dirty: boolean) => {
   updateTitle(doc)
 })
 
+ipcMain.on('doc:scroll', (e, top: number) => {
+  const doc = docOf(e)
+  if (doc?.path) setScroll(doc.path, top)
+})
+
 ipcMain.on('doc:recovery', (e, content: string) => {
   const doc = docOf(e)
   if (doc && !doc.path && doc.dirty) writeRecovery(doc, content).catch(() => {})
@@ -453,7 +462,7 @@ ipcMain.handle('image:upload-all', async (e, markdown: string) => {
   return r.uploaded ? r.markdown : null
 })
 
-ipcMain.handle('export:doc', async (e, kind: 'html' | 'pdf' | 'docx', markdown: string) => {
+ipcMain.handle('export:doc', async (e, kind: 'html' | 'pdf' | 'docx', markdown: string, diagrams: Record<string, string> = {}) => {
   const doc = docOf(e)
   if (!doc) return false
   const base = doc.path ? path.basename(doc.path, path.extname(doc.path)) : '未命名'
@@ -465,7 +474,7 @@ ipcMain.handle('export:doc', async (e, kind: 'html' | 'pdf' | 'docx', markdown: 
   const baseDir = doc.path ? path.dirname(doc.path) : undefined
   try {
     const s = getSettings()
-    if (kind === 'html') await fs.writeFile(r.filePath, await renderHtml(markdown, base, baseDir, { imageAlign: s.imageAlign }), 'utf8')
+    if (kind === 'html') await fs.writeFile(r.filePath, await renderHtml(markdown, base, baseDir, { imageAlign: s.imageAlign, diagrams }), 'utf8')
     else if (kind === 'docx') await renderDocx(markdown, baseDir, r.filePath)
     else {
       const pdf = await renderPdf(markdown, base, baseDir, {
@@ -473,6 +482,7 @@ ipcMain.handle('export:doc', async (e, kind: 'html' | 'pdf' | 'docx', markdown: 
         footer: s.pdfFooter,
         pageNumbers: s.pdfPageNumbers,
         imageAlign: s.imageAlign,
+        diagrams,
       })
       await fs.writeFile(r.filePath, pdf)
     }
@@ -483,6 +493,15 @@ ipcMain.handle('export:doc', async (e, kind: 'html' | 'pdf' | 'docx', markdown: 
   shell.showItemInFolder(r.filePath)
   return true
 })
+
+// ---------- 演示模式 ----------
+
+ipcMain.handle('present:render', (_e, markdown: string, diagrams: Record<string, string> = {}) => {
+  const deck = splitSlides(markdown)
+  return { ...deck, pages: deck.pages.map((p) => renderBody(p, diagrams).html) }
+})
+
+ipcMain.on('win:fullscreen', (e, on: boolean) => docOf(e)?.win.setFullScreen(on))
 
 // ---------- 设置 / 主题 ----------
 
@@ -613,6 +632,8 @@ async function buildMenu() {
         },
         item('查找…', 'CmdOrCtrl+F', 'find'),
         item('查找并替换…', 'Alt+CmdOrCtrl+F', 'replace'),
+        item('查找下一个', 'CmdOrCtrl+G', 'find-next'),
+        item('查找上一个', 'Shift+CmdOrCtrl+G', 'find-prev'),
         { type: 'separator' },
         item('插入图片…', 'Ctrl+CmdOrCtrl+I', 'insert-image'),
         item('上传所有本地图片', undefined, 'upload-images'),
@@ -653,6 +674,7 @@ async function buildMenu() {
         item('源码模式', 'CmdOrCtrl+/', 'toggle-source'),
         item('专注模式', 'F8', 'toggle-focus'),
         item('打字机模式', 'F9', 'toggle-typewriter'),
+        item('演示（幻灯片）', 'F5', 'present'),
         { type: 'separator' },
         {
           label: '主题',
@@ -689,13 +711,26 @@ async function buildMenu() {
 
 // ---------- 窗口 ----------
 
+/** 新窗口的位置大小：沿用上次的；已有窗口时在当前窗口基础上错开一点 */
+function initialBounds(): Partial<Electron.Rectangle> {
+  const size = { width: 1040, height: 780 }
+  const saved = getBounds()
+  const anchor = BrowserWindow.getFocusedWindow()?.getNormalBounds() ?? (docs.size ? null : saved)
+  if (!anchor) return saved ? { width: saved.width, height: saved.height } : size
+  const offset = anchor === saved ? 0 : 24
+  const b = { ...anchor, x: anchor.x + offset, y: anchor.y + offset }
+  // 上次的显示器可能已经拔掉，窗口落在屏幕外就只用尺寸
+  const area = screen.getDisplayMatching(b).workArea
+  const visible = b.x < area.x + area.width - 100 && b.y < area.y + area.height - 100 && b.x + b.width > area.x + 100 && b.y >= area.y - 10
+  return visible ? b : { width: b.width, height: b.height }
+}
+
 async function createWindow(init?: DocInit): Promise<Doc> {
   if (init?.path) {
     init = { ...init, content: await fs.readFile(init.path, 'utf8') }
   }
   const win = new BrowserWindow({
-    width: 1040,
-    height: 780,
+    ...initialBounds(),
     minWidth: 480,
     minHeight: 320,
     titleBarStyle: 'hiddenInset',
@@ -723,6 +758,15 @@ async function createWindow(init?: DocInit): Promise<Doc> {
   docs.set(id, doc)
 
   win.once('ready-to-show', () => win.show())
+  // 窗口标题由 updateTitle 管理，不让网页的 <title> 覆盖成“iTypora”
+  win.on('page-title-updated', (e) => e.preventDefault())
+  let boundsTimer: NodeJS.Timeout | undefined
+  const saveBounds = () => {
+    clearTimeout(boundsTimer)
+    boundsTimer = setTimeout(() => !win.isDestroyed() && !win.isFullScreen() && setBounds(win.getNormalBounds()), 500)
+  }
+  win.on('resize', saveBounds)
+  win.on('move', saveBounds)
   win.webContents.on('context-menu', (_e, p) => {
     const items: MenuItemConstructorOptions[] = []
     if (p.misspelledWord) {
@@ -849,6 +893,7 @@ app.setAboutPanelOptions({ applicationName: 'iTypora', applicationVersion: appVe
 
 app.whenReady().then(async () => {
   const s = await loadSettings()
+  await loadSession()
   // 开发模式下没有 .app 包，手动设置 Dock 图标
   if (!app.isPackaged) app.dock?.setIcon(path.join(__dirname, '../../build/icon.png'))
   applyNativeTheme(s.theme)
@@ -860,11 +905,22 @@ app.whenReady().then(async () => {
   const restored = await restoreRecovered()
   const argFiles = process.argv.slice(app.isPackaged ? 1 : 2).filter((a) => !a.startsWith('-') && isMd(a))
   for (const f of [...pendingOpen, ...argFiles]) await openFileSmart(path.resolve(f))
+  // 没有指定文件时，重新打开上次退出时开着的文档
+  if (!restored && !docs.size && s.restoreSession) {
+    for (const f of getSessionFiles()) {
+      if (await fs.access(f).then(() => true, () => false)) await openFileSmart(f)
+    }
+  }
   if (!restored && !docs.size) await createWindow()
 
   app.on('activate', () => {
     if (!BrowserWindow.getAllWindows().length) createWindow()
   })
+})
+
+app.on('before-quit', () => {
+  setSessionFiles([...docs.values()].map((d) => d.path).filter((p): p is string => !!p))
+  flushSession()
 })
 
 app.on('window-all-closed', () => process.platform !== 'darwin' && app.quit())

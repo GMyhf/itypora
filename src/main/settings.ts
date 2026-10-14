@@ -20,6 +20,7 @@ export interface Settings {
   pdfPageNumbers: boolean
   imageAlign: 'left' | 'center'
   spellcheck: boolean
+  restoreSession: boolean
 }
 
 export const DEFAULTS: Settings = {
@@ -40,6 +41,7 @@ export const DEFAULTS: Settings = {
   pdfPageNumbers: true,
   imageAlign: 'center',
   spellcheck: true,
+  restoreSession: true,
 }
 
 const file = () => path.join(app.getPath('userData'), 'settings.json')

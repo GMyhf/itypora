@@ -66,6 +66,15 @@ md.inline.ruler.before('escape', 'math_inline', (state, silent) => {
 })
 md.renderer.rules.math_inline = (tokens, i) => mathHtml(tokens[i].content, false)
 
+// mermaid 代码块：用渲染进程预先画好的 SVG 替换（env.diagrams：代码 -> SVG）
+const defaultFence = md.renderer.rules.fence!
+md.renderer.rules.fence = (tokens, i, options, env, self) => {
+  const t = tokens[i]
+  const diagrams = env?.diagrams as Record<string, string> | undefined
+  const svg = t.info.trim().toLowerCase() === 'mermaid' ? diagrams?.[t.content.replace(/\n$/, '')] : undefined
+  return svg ? `<div class="mermaid">${svg}</div>\n` : defaultFence(tokens, i, options, env, self)
+}
+
 const CSS = `
 body{font:16px/1.7 -apple-system,BlinkMacSystemFont,'PingFang SC','Helvetica Neue',sans-serif;color:#24292f;max-width:820px;margin:40px auto;padding:0 24px}
 h1,h2{border-bottom:1px solid #d8dee4;padding-bottom:.3em}
@@ -73,7 +82,7 @@ code{background:#f3f4f6;padding:.15em .35em;border-radius:4px;font-family:Menlo,
 pre{background:#f6f8fa;padding:14px 16px;border-radius:6px;overflow:auto}pre code{background:none;padding:0}
 blockquote{margin:0;padding:0 1em;color:#57606a;border-left:4px solid #d0d7de}
 table{border-collapse:collapse}th,td{border:1px solid #d0d7de;padding:6px 13px}
-img{max-width:100%}.img-center img{display:block;margin:0 auto}.img-center p:has(>img:only-child){text-align:center}hr{border:0;border-top:1px solid #d0d7de}
+img{max-width:100%}.mermaid{text-align:center;margin:1em 0;break-inside:avoid}.mermaid svg{max-width:100%;height:auto}.img-center img{display:block;margin:0 auto}.img-center p:has(>img:only-child){text-align:center}hr{border:0;border-top:1px solid #d0d7de}
 @media print{body{margin:0;max-width:none}}
 `
 
@@ -105,8 +114,9 @@ interface Heading {
 }
 
 /** 渲染正文，同时给标题加上 id 并收集目录 */
-function renderBody(markdown: string): { html: string; headings: Heading[] } {
-  const tokens = md.parse(markdown, {})
+export function renderBody(markdown: string, diagrams: Record<string, string> = {}): { html: string; headings: Heading[] } {
+  const env = { diagrams }
+  const tokens = md.parse(markdown, env)
   const headings: Heading[] = []
   const used = new Map<string, number>()
   tokens.forEach((t, i) => {
@@ -119,7 +129,7 @@ function renderBody(markdown: string): { html: string; headings: Heading[] } {
     t.attrSet('id', id)
     headings.push({ level: Number(t.tag.slice(1)), text, id })
   })
-  let html = md.renderer.render(tokens, md.options, {})
+  let html = md.renderer.render(tokens, md.options, env)
   // Typora 的 [TOC]：独占一段时，替换为文内目录
   if (headings.length) {
     const min = Math.min(...headings.map((h) => h.level))
@@ -147,10 +157,10 @@ export async function renderHtml(
   markdown: string,
   title: string,
   baseDir?: string,
-  opts: { toc?: boolean; imageAlign?: string } = {},
+  opts: { toc?: boolean; imageAlign?: string; diagrams?: Record<string, string> } = {},
 ): Promise<string> {
   const base = baseDir ? `<base href="${pathToFileURL(baseDir).toString()}/">` : ''
-  const { html, headings } = renderBody(markdown)
+  const { html, headings } = renderBody(markdown, opts.diagrams)
   const toc = opts.toc !== false && headings.length > 0
   const minLevel = Math.min(...headings.map((h) => h.level))
   const nav = toc
@@ -166,20 +176,36 @@ export interface PdfOptions {
   footer: string
   pageNumbers: boolean
   imageAlign: string
+  diagrams?: Record<string, string>
 }
 
-/** 页眉页脚文本：支持 {title}、{date} 占位符 */
+/** 页眉页脚文本：支持 {title}、{date}、{page}、{total} 占位符 */
 const fill = (text: string, title: string) =>
-  esc(text).replace(/\{title\}/g, esc(title)).replace(/\{date\}/g, new Date().toLocaleDateString('zh-CN'))
+  esc(text)
+    .replace(/\{title\}/g, esc(title))
+    .replace(/\{date\}/g, new Date().toLocaleDateString('zh-CN'))
+    .replace(/\{page\}/g, '<span class="pageNumber"></span>')
+    .replace(/\{total\}/g, '<span class="totalPages"></span>')
+
+/** 用 | 分隔成左、中、右三栏（如“{title} | | 第 {page} 页”）；不含 | 时居中 */
+export function headerFooterHtml(text: string, title: string, style: string): string {
+  const parts = text.split('|').map((p) => fill(p.trim(), title))
+  if (parts.length === 1) return `<div style="${style};text-align:center">${parts[0]}</div>`
+  const [left, center, right] = parts.length === 2 ? [parts[0], '', parts[1]] : parts
+  const cell = (html: string, align: string) => `<span style="flex:1;text-align:${align}">${html}</span>`
+  return `<div style="${style};display:flex">${cell(left, 'left')}${cell(center, 'center')}${cell(right ?? '', 'right')}</div>`
+}
 
 export async function renderPdf(markdown: string, title: string, baseDir: string | undefined, o: PdfOptions): Promise<Buffer> {
   const tmp = path.join(os.tmpdir(), `itypora-${Date.now()}.html`)
-  await fs.writeFile(tmp, await renderHtml(markdown, title, baseDir, { toc: false, imageAlign: o.imageAlign }), 'utf8')
+  await fs.writeFile(tmp, await renderHtml(markdown, title, baseDir, { toc: false, imageAlign: o.imageAlign, diagrams: o.diagrams }), 'utf8')
   const win = new BrowserWindow({ show: false })
   const style = 'font-size:9px;width:100%;margin:0 24px;color:#666;font-family:-apple-system,PingFang SC,sans-serif'
   const show = !!(o.header || o.footer || o.pageNumbers)
-  const pages = o.pageNumbers ? '<span class="pageNumber"></span> / <span class="totalPages"></span>' : ''
-  const footer = [fill(o.footer, title), pages].filter(Boolean).join('&nbsp;&nbsp;&nbsp;')
+  // 页脚里已经自己写了 {page} 就不再追加页码
+  const pages = o.pageNumbers && !/\{page\}/.test(o.header + o.footer) ? '{page} / {total}' : ''
+  // 页码接在页脚末尾（分栏时落在最右一栏）
+  const footer = [o.footer, pages].filter(Boolean).join('\u00a0\u00a0\u00a0')
   try {
     await win.loadFile(tmp)
     return await win.webContents.printToPDF({
@@ -188,8 +214,8 @@ export async function renderPdf(markdown: string, title: string, baseDir: string
       generateDocumentOutline: true,
       generateTaggedPDF: true, // 书签导航依赖带标签的 PDF
       displayHeaderFooter: show,
-      headerTemplate: `<div style="${style};text-align:center">${fill(o.header, title)}</div>`,
-      footerTemplate: `<div style="${style};text-align:center">${footer}</div>`,
+      headerTemplate: headerFooterHtml(o.header, title, style),
+      footerTemplate: headerFooterHtml(footer, title, style),
       margins: show ? { top: 0.7, bottom: 0.7, left: 0.4, right: 0.4 } : undefined,
     })
   } finally {

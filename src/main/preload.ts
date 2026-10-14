@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('api', {
   save: (content: string, saveAs: boolean, silent: boolean) => invoke('file:save', content, saveAs, silent),
   setDirty: (dirty: boolean) => ipcRenderer.send('doc:dirty', dirty),
   recovery: (content: string) => ipcRenderer.send('doc:recovery', content),
+  setScroll: (top: number) => ipcRenderer.send('doc:scroll', top),
   openPath: (file: string) => invoke('file:open-path', file),
   readDir: (dir: string) => invoke('dir:read', dir),
   treeMenu: (file: string, isDir: boolean) => invoke('tree:menu', file, isDir),
@@ -21,8 +22,11 @@ contextBridge.exposeInMainWorld('api', {
   saveImage: (bytes: Uint8Array, ext: string) => invoke('image:save', bytes, ext),
   uploadImages: (markdown: string) => invoke('image:upload-all', markdown),
   pickImage: () => invoke('image:pick'),
-  exportDoc: (kind: 'html' | 'pdf' | 'docx', markdown: string) => invoke('export:doc', kind, markdown),
+  exportDoc: (kind: 'html' | 'pdf' | 'docx', markdown: string, diagrams?: Record<string, string>) =>
+    invoke('export:doc', kind, markdown, diagrams),
   patchSettings: (patch: Record<string, unknown>) => invoke('settings:patch', patch),
   themeCss: (id: string) => invoke('theme:css', id),
+  renderSlides: (markdown: string, diagrams: Record<string, string>) => invoke('present:render', markdown, diagrams),
+  setFullScreen: (on: boolean) => ipcRenderer.send('win:fullscreen', on),
   pathForFile: (f: File) => webUtils.getPathForFile(f),
 })

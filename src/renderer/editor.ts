@@ -17,6 +17,8 @@ import {
 import { insertTableCommand, toggleStrikethroughCommand } from '@milkdown/kit/preset/gfm'
 import type { EditorView } from '@milkdown/kit/prose/view'
 import type { Node as PMNode } from '@milkdown/kit/prose/model'
+import { codeBlockConfig } from '@milkdown/kit/component/code-block'
+import { renderMermaid } from './mermaid'
 import { findPlugin, focusPlugin, imagePastePlugin } from './plugins'
 
 export interface EditorHooks {
@@ -79,6 +81,30 @@ export class Editor {
         },
       })
       crepe.editor
+        .config((ctx) => {
+          // mermaid 代码块显示为图表预览（与 LaTeX 预览同样的机制）
+          ctx.update(codeBlockConfig.key, (prev) => ({
+            ...prev,
+            renderPreview: (language, content, apply) => {
+              if (language.toLowerCase() !== 'mermaid' || !content.trim()) return prev.renderPreview(language, content, apply)
+              const dark = ['dark', 'night'].includes(document.documentElement.dataset.theme ?? '')
+              // 传 DOM 元素而不是字符串：字符串会被消毒，SVG 里的 foreignObject 标签文字会丢失
+              const box = document.createElement('div')
+              box.className = 'mermaid-preview'
+              renderMermaid(content, dark).then(
+                (svg) => {
+                  box.innerHTML = svg
+                  apply(box)
+                },
+                (err) => {
+                  box.className = 'mermaid-error'
+                  box.textContent = `Mermaid 语法错误：${err?.message ?? err}`
+                  apply(box)
+                },
+              )
+            },
+          }))
+        })
         .use(findPlugin)
         .use(focusPlugin)
         .use(imagePastePlugin((f) => this.hooks.upload(f), (src) => this.insertImage(src)))

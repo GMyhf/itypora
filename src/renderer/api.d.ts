@@ -8,6 +8,8 @@ export interface FileInfo {
   path: string | null
   content: string
   reload: boolean
+  /** 打开后滚动到的位置（上次的阅读位置） */
+  scroll?: number
   folder: string | null
   baseUrl: string | null
   dirty?: boolean
@@ -31,6 +33,16 @@ export interface Settings {
   pdfPageNumbers: boolean
   imageAlign: 'left' | 'center'
   spellcheck: boolean
+  restoreSession: boolean
+}
+
+export interface SlideDeck {
+  /** 每页渲染好的 HTML */
+  pages: string[]
+  size: '16:9' | '4:3'
+  paginate: boolean
+  header: string
+  footer: string
 }
 
 export interface Api {
@@ -44,6 +56,7 @@ export interface Api {
   save(content: string, saveAs: boolean, silent: boolean): Promise<boolean>
   setDirty(dirty: boolean): void
   recovery(content: string): void
+  setScroll(top: number): void
   openPath(file: string): Promise<void>
   readDir(dir: string): Promise<TreeEntry[]>
   treeMenu(file: string, isDir: boolean): Promise<'create' | 'rename' | 'trash' | 'reveal' | null>
@@ -53,9 +66,11 @@ export interface Api {
   saveImage(bytes: Uint8Array, ext: string): Promise<string>
   pickImage(): Promise<string | null>
   uploadImages(markdown: string): Promise<string | null>
-  exportDoc(kind: 'html' | 'pdf' | 'docx', markdown: string): Promise<boolean>
+  exportDoc(kind: 'html' | 'pdf' | 'docx', markdown: string, diagrams?: Record<string, string>): Promise<boolean>
   patchSettings(patch: Partial<Settings>): Promise<Settings>
   themeCss(id: string): Promise<string>
+  renderSlides(markdown: string, diagrams: Record<string, string>): Promise<SlideDeck>
+  setFullScreen(on: boolean): void
   pathForFile(f: File): string
 }
 

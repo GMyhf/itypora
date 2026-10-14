@@ -115,3 +115,41 @@ html[data-platform='darwin'] #sidebar { padding-top: 28px; }
 html[data-image-align='center'] .milkdown .milkdown-image-block { margin-left: auto; margin-right: auto; }
 html[data-image-align='center'] .milkdown .milkdown-image-block > .image-wrapper { margin-left: auto; margin-right: auto; }
 html[data-image-align='center'] .milkdown p:has(> .milkdown-image-inline:only-child) { text-align: center; }
+
+/* Mermaid 预览 */
+.mermaid-preview { display: flex; justify-content: center; overflow-x: auto; }
+.mermaid-preview svg { max-width: 100%; height: auto; }
+.mermaid-error { color: #d14; font-size: 13px; white-space: pre-wrap; }
+
+/* 演示模式 */
+#presenter { position: fixed; inset: 0; z-index: 100; background: #000; outline: none; overflow: hidden; }
+#presenter.idle { cursor: none; }
+#presenter .stage {
+  position: absolute; top: 50%; left: 50%; transform-origin: center; box-sizing: border-box;
+  display: flex; flex-direction: column; padding: 40px 72px 28px;
+  background: var(--page-bg); color: var(--chrome-fg);
+  font: 30px/1.55 var(--font-family);
+}
+#presenter header, #presenter footer { flex: none; min-height: 24px; font-size: 18px; color: var(--chrome-muted); }
+#presenter footer { display: flex; justify-content: space-between; }
+#presenter .slide-body { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+#presenter .slide-body > :first-child { margin-top: 0; }
+#presenter .slide-body.lead { align-items: center; text-align: center; }
+#presenter .slide-body.lead h1 { font-size: 2.2em; border: 0; }
+#presenter h1 { font-size: 1.7em; margin: 0 0 .5em; }
+#presenter h2 { font-size: 1.4em; margin: 0 0 .5em; }
+#presenter h3 { font-size: 1.15em; margin: .4em 0; }
+#presenter p, #presenter ul, #presenter ol { margin: .35em 0; }
+#presenter li { margin: .15em 0; }
+#presenter a { color: var(--accent); }
+#presenter code { font-family: Menlo, Monaco, monospace; font-size: .85em; background: var(--chrome-hover); padding: .1em .3em; border-radius: 4px; }
+#presenter pre { background: var(--chrome-bg); padding: .6em .9em; border-radius: 8px; overflow: hidden; font-size: .75em; line-height: 1.45; }
+#presenter pre code { background: none; padding: 0; }
+#presenter blockquote { margin: .4em 0; padding: 0 .8em; border-left: 6px solid var(--chrome-border); color: var(--chrome-muted); }
+#presenter table { border-collapse: collapse; font-size: .8em; }
+#presenter th, #presenter td { border: 1px solid var(--chrome-border); padding: .25em .6em; }
+#presenter img { max-width: 100%; max-height: 520px; object-fit: contain; }
+#presenter p:has(> img:only-child) { text-align: center; }
+#presenter .mermaid { display: flex; justify-content: center; }
+#presenter .mermaid svg { max-width: 100%; max-height: 520px; height: auto; }
+#presenter .math-block { text-align: center; }

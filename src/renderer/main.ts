@@ -4,8 +4,10 @@ import './style.css'
 import './themes/themes.css'
 import type { FileInfo, Settings } from './api'
 import { Editor, extOf } from './editor'
+import { renderAllMermaid } from './mermaid'
 import { extractOutline } from './outline'
 import { finder, viewModes } from './plugins'
+import { Presenter } from './presenter'
 import { Sidebar } from './sidebar'
 import { countStats } from './stats'
 
@@ -78,7 +80,7 @@ async function save(saveAs: boolean, silent = false) {
 }
 
 async function load(info: FileInfo) {
-  const keep = info.reload ? scroller.scrollTop : 0
+  const keep = info.reload ? scroller.scrollTop : info.scroll ?? 0
   if (sourceMode) setSourceMode(false, false)
   closeFind()
   currentPath = info.path
@@ -90,11 +92,16 @@ async function load(info: FileInfo) {
   dirty = !!info.dirty
   api.setDirty(dirty)
   scroller.scrollTop = keep
+  // 图片、图表加载后高度才稳定，稍后再定位一次
+  if (keep && !info.reload) setTimeout(() => (scroller.scrollTop = keep), 300)
   if (info.folder && info.folder !== sidebarFolder) await setFolder(info.folder)
   sidebar.markCurrent()
   refreshDerived()
   if (!info.reload) editor.focus()
 }
+
+// 记住每个文件的阅读位置
+scroller.addEventListener('scroll', debounce(() => currentPath && api.setScroll(scroller.scrollTop), 500))
 
 // ---------- 大纲 / 状态栏 ----------
 
@@ -337,6 +344,7 @@ function openPrefs() {
   $<HTMLInputElement>('pref-pdf-footer').value = settings.pdfFooter
   $<HTMLInputElement>('pref-pdf-pages').checked = settings.pdfPageNumbers
   $<HTMLInputElement>('pref-spellcheck').checked = settings.spellcheck
+  $<HTMLInputElement>('pref-restore-session').checked = settings.restoreSession
   syncUploaderRows()
   modal.hidden = false
   prefsForm.hidden = false
@@ -358,6 +366,7 @@ $('pref-pdf-header').addEventListener('change', (e) => api.patchSettings({ pdfHe
 $('pref-pdf-footer').addEventListener('change', (e) => api.patchSettings({ pdfFooter: (e.target as HTMLInputElement).value.trim() }))
 $('pref-pdf-pages').addEventListener('change', (e) => api.patchSettings({ pdfPageNumbers: (e.target as HTMLInputElement).checked }))
 $('pref-spellcheck').addEventListener('change', (e) => api.patchSettings({ spellcheck: (e.target as HTMLInputElement).checked }))
+$('pref-restore-session').addEventListener('change', (e) => api.patchSettings({ restoreSession: (e.target as HTMLInputElement).checked }))
 prefsForm.addEventListener('submit', (e) => e.preventDefault())
 $('prefs-close').addEventListener('click', closeModal)
 $('pref-theme').addEventListener('change', (e) => api.patchSettings({ theme: (e.target as HTMLSelectElement).value }))
@@ -396,8 +405,27 @@ dark.addEventListener('change', () => settings && applySettings(settings))
 
 // ---------- 命令分发 ----------
 
+// ---------- 演示 ----------
+
+const presenter = new Presenter(() => {
+  api.setFullScreen(false)
+  if (sourceMode) source.focus()
+  else editor.focus()
+})
+
+async function present() {
+  if (presenter.active) return presenter.stop()
+  const md = markdown()
+  const dark = root.dataset.theme === 'dark' || root.dataset.theme === 'night'
+  const deck = await api.renderSlides(md, await renderAllMermaid(md, dark))
+  api.setFullScreen(true)
+  presenter.start(deck, editor.baseUrl)
+}
+
 async function exportDoc(kind: 'html' | 'pdf' | 'docx') {
-  await api.exportDoc(kind, markdown())
+  const md = markdown()
+  // Word 由 pandoc 转换，保留 mermaid 代码块原样
+  await api.exportDoc(kind, md, kind === 'docx' ? {} : await renderAllMermaid(md))
 }
 
 api.on('cmd', async (name, arg) => {
@@ -409,6 +437,11 @@ api.on('cmd', async (name, arg) => {
     case 'export-docx': return exportDoc('docx')
     case 'find': return openFind(false)
     case 'replace': return openFind(true)
+    case 'find-next':
+    case 'find-prev':
+      if (findBar.hidden || !findInput.value) return openFind(false)
+      return stepFind(name === 'find-next' ? 1 : -1)
+    case 'present': return present()
     case 'preferences': return openPrefs()
     case 'toggle-sidebar': {
       const show = !!sidebarEl.hidden
